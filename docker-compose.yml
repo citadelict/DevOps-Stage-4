@@ -1,11 +1,12 @@
-version: '3.8'
+version: "3.8"
 
 services:
   traefik:
-    image: traefik:v2.10
+    image: "traefik:v2.10"
+    container_name: "traefik"
     command:
       - "--log.level=DEBUG"
-      - "--api.dashboard=true"
+      - "--api.insecure=false"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
@@ -17,96 +18,130 @@ services:
     ports:
       - "80:80"
       - "443:443"
-      - "8080:8080"
+    networks:
+      - web
     volumes:
       - ./traefik/acme.json:/etc/traefik/acme.json
       - /var/run/docker.sock:/var/run/docker.sock
     labels:
       - "traefik.enable=true"
-      - "traefik.http.middlewares.https-redirect.redirectscheme.scheme=https"
-      - "traefik.http.middlewares.https-redirect.redirectscheme.permanent=true"
-      # Dashboard access
+      # Dashboard
       - "traefik.http.routers.dashboard.rule=Host(`traefik.demo-domain.online`)"
-      - "traefik.http.routers.dashboard.entrypoints=websecure"
       - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
       - "traefik.http.routers.dashboard.tls.certresolver=letsencryptresolver"
+      - "traefik.http.routers.dashboard.middlewares=auth"
       - "traefik.http.middlewares.auth.basicauth.users=admin:$$apr1$$0s0j0dWJ$$Q1Z9Ul9tqExfjFSf5RgMR0"
-    networks:
-      - web
+      # ACME challenge
+      - "traefik.http.routers.acme.rule=PathPrefix(`/.well-known/acme-challenge/`)"
+      - "traefik.http.routers.acme.entrypoints=web"
+      - "traefik.http.routers.acme.service=api@internal"
+      - "traefik.http.routers.acme.tls=false"
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    expose:
-      - "80"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.frontend.rule=Host(`demo-domain.online`)"
-      - "traefik.http.routers.frontend.entrypoints=websecure"
-      - "traefik.http.routers.frontend.tls.certresolver=letsencryptresolver"
+    ports:
+      - "${PORT}:${PORT}"
+    environment:
+      - VITE_AUTH_API_ADDRESS=${AUTH_API_ADDRESS}
+      - VITE_TODOS_API_ADDRESS=${TODOS_API_ADDRESS}
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     depends_on:
       - auth-api
       - todos-api
+    command: sh -c "npm run dev -- --host 0.0.0.0"
     networks:
       - web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`demo-domain.online`)"
+      - "traefik.http.services.frontend.loadbalancer.server.port=${PORT}"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls.certresolver=letsencryptresolver"
 
   auth-api:
     build:
       context: ./auth-api
       dockerfile: Dockerfile
-    expose:
-      - "8080"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.auth.rule=Host(`demo-domain.online`) && PathPrefix(`/api/auth`)"
-      - "traefik.http.routers.auth.entrypoints=websecure"
-      - "traefik.http.routers.auth.tls.certresolver=letsencryptresolver"
+    ports:
+      - "${AUTH_API_PORT}:${AUTH_API_PORT}"
+    environment:
+      - JWT_SECRET=${JWT_SECRET}
+      - USERS_API_ADDRESS=${USERS_API_ADDRESS}
     depends_on:
       - users-api
     networks:
       - web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.auth.rule=Host(`demo-domain.online`) && PathPrefix(`/api/auth`)"
+      - "traefik.http.services.auth.loadbalancer.server.port=${AUTH_API_PORT}"
+      - "traefik.http.routers.auth.entrypoints=websecure"
+      - "traefik.http.routers.auth.tls.certresolver=letsencryptresolver"
 
   todos-api:
     build:
       context: ./todos-api
       dockerfile: Dockerfile
-    expose:
-      - "8082"
+    ports:
+      - "${TODOS_API_PORT}:${TODOS_API_PORT}"
+    environment:
+      - JWT_SECRET=${JWT_SECRET}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_CHANNEL=${REDIS_CHANNEL}
+    depends_on:
+      - redis-queue
+    networks:
+      - web
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.todos.rule=Host(`demo-domain.online`) && PathPrefix(`/api/todos`)"
+      - "traefik.http.services.todos.loadbalancer.server.port=${TODOS_API_PORT}"
       - "traefik.http.routers.todos.entrypoints=websecure"
       - "traefik.http.routers.todos.tls.certresolver=letsencryptresolver"
-    depends_on:
-      - redis
-    networks:
-      - web
 
   users-api:
     build:
       context: ./users-api
       dockerfile: Dockerfile
-    expose:
-      - "8083"
+    ports:
+      - "${SERVER_PORT}:${SERVER_PORT}"
+    environment:
+      - JWT_SECRET=${JWT_SECRET}
+      - DEFAULT_ADMIN_USERNAME=${DEFAULT_ADMIN_USERNAME}
+      - DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD}
+      - DEFAULT_HNG_USERNAME=${DEFAULT_HNG_USERNAME}
+      - DEFAULT_HNG_PASSWORD=${DEFAULT_HNG_PASSWORD}
+      - DEFAULT_USER_USERNAME=${DEFAULT_USER_USERNAME}
+      - DEFAULT_USER_PASSWORD=${DEFAULT_USER_PASSWORD}
+    networks:
+      - web
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.users.rule=Host(`demo-domain.online`) && PathPrefix(`/api/users`)"
+      - "traefik.http.services.users.loadbalancer.server.port=${SERVER_PORT}"
       - "traefik.http.routers.users.entrypoints=websecure"
       - "traefik.http.routers.users.tls.certresolver=letsencryptresolver"
-    networks:
-      - web
 
   log-message-processor:
     build:
       context: ./log-message-processor
       dockerfile: Dockerfile
+    environment:
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_CHANNEL=${REDIS_CHANNEL}
     depends_on:
-      - redis
+      - redis-queue
     networks:
       - web
 
-  redis:
+  redis-queue:
     image: redis:alpine
     networks:
       - web
