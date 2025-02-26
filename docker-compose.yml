@@ -23,8 +23,6 @@ services:
     labels:
       - "traefik.enable=true"
       # frontend
-      - "traefik.http.routers.frontend.rule=Host(`demo-domain.online`) && (PathPrefix(`/`) || PathPrefix(`/`))"
-      - "traefik.http.routers.frontend.service=api@internal"
       - "traefik.http.routers.frontend.entrypoints=websecure"
       - "traefik.http.routers.frontend.tls.certresolver=letsencryptresolver"
       - "traefik.http.routers.frontend.middlewares=auth"
@@ -89,7 +87,8 @@ services:
       - traefik.http.routers.todos.rule=(Host(`demo-domain.online`) && PathPrefix(`/api/todos`))
       - traefik.http.routers.todos.entrypoints=websecure
       - traefik.http.routers.todos.tls.certresolver=letsencryptresolver
-      - traefik.http.routers.todos.service=todos-api
+      - traefik.http.services.users-api.loadbalancer.server.port=8083
+      - traefik.http.routers.todos.service=todos
     depends_on:
       - redis
     networks:
@@ -115,7 +114,7 @@ services:
       - traefik.http.routers.users-https.rule=(Host(`demo-domain.online`) && PathPrefix(`/api/users`))
       - traefik.http.routers.users-https.entrypoints=websecure
       - traefik.http.routers.users-https.tls.certresolver=letsencryptresolver
-      - traefik.http.routers.users-https.service=users-api
+      - traefik.http.routers.users-https.service=users
     networks:
       - web
 
