@@ -1,11 +1,10 @@
 version: '3.8'
-
 services:
   traefik:
     image: traefik:v2.10
     command:
       - "--log.level=DEBUG"
-      - "--api.insecure=false"
+      - "--api.insecure=true"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
@@ -17,22 +16,26 @@ services:
     ports:
       - "80:80"
       - "443:443"
+      - "8080:8080"
     volumes:
       - ./traefik/acme.json:/etc/traefik/acme.json
       - /var/run/docker.sock:/var/run/docker.sock
     labels:
       - "traefik.enable=true"
-      # frontend
-      - "traefik.http.routers.frontend.entrypoints=websecure"
-      - "traefik.http.routers.frontend.tls.certresolver=letsencryptresolver"
-      - "traefik.http.routers.frontend.middlewares=auth"
+      - "traefik.http.middlewares.https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.https-redirect.redirectscheme.permanent=true"
+      # Dashboard
+      - "traefik.http.routers.dashboard.rule=Host(`demo-domain.online`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.routers.dashboard.tls.certresolver=letsencryptresolver"
+      - "traefik.http.routers.dashboard.middlewares=auth"
       - "traefik.http.middlewares.auth.basicauth.users=admin:$$apr1$$0s0j0dWJ$$Q1Z9Ul9tqExfjFSf5RgMR0"
       # ACME challenge
       - "traefik.http.routers.acme.rule=PathPrefix(`/.well-known/acme-challenge/`)"
       - "traefik.http.routers.acme.entrypoints=web"
       - "traefik.http.routers.acme.service=api@internal"
       - "traefik.http.routers.acme.tls=false"
-    
     networks:
       - web
 
@@ -46,7 +49,7 @@ services:
       - "traefik.http.services.frontend.loadbalancer.server.port=8080"
       - "traefik.http.routers.frontend.entrypoints=websecure"
       - "traefik.http.routers.frontend.tls.certresolver=letsencryptresolver"
-      - "traefik.http.routers.frontend.priority=1" 
+      - "traefik.http.routers.frontend.priority=1"
     depends_on:
       - auth-api
       - todos-api
@@ -62,7 +65,7 @@ services:
       - "traefik.http.routers.auth.rule=Host(`demo-domain.online`) && PathPrefix(`/api/auth`)"
       - "traefik.http.routers.auth.entrypoints=websecure"
       - "traefik.http.routers.auth.tls.certresolver=letsencryptresolver"
-      - "traefik.http.services.auth.loadbalancer.server.port=8080"  
+      - "traefik.http.services.auth.loadbalancer.server.port=8080"
     depends_on:
       - users-api
     networks:
@@ -73,22 +76,12 @@ services:
       context: ./todos-api
       dockerfile: Dockerfile
     labels:
-      - traefik.enable=true
-      # HTTP Service
-      - traefik.http.services.todos.loadbalancer.server.port=8082
-      # HTTP Router ()
-      - traefik.http.routers.todos-http.rule=(Host(`demo-domain.online`) && PathPrefix(`/api/todos`))
-      - traefik.http.routers.todos-http.entrypoints=web
-      # HTTP to HTTPS redirect
-      - traefik.http.routers.todos-http.middlewares=https-redirect
-      - traefik.http.middlewares.https-redirect.redirectScheme.scheme=https
-      - traefik.http.middlewares.https-redirect.redirectScheme.permanent=true
-      # HTTPS Router
-      - traefik.http.routers.todos.rule=(Host(`demo-domain.online`) && PathPrefix(`/api/todos`))
-      - traefik.http.routers.todos.entrypoints=websecure
-      - traefik.http.routers.todos.tls.certresolver=letsencryptresolver
-      - traefik.http.services.users-api.loadbalancer.server.port=8083
-      - traefik.http.routers.todos.service=todos
+      - "traefik.enable=true"
+      - "traefik.http.services.todos.loadbalancer.server.port=8082"
+      - "traefik.http.routers.todos.rule=Host(`demo-domain.online`) && PathPrefix(`/api/todos`)"
+      - "traefik.http.routers.todos.entrypoints=websecure"
+      - "traefik.http.routers.todos.tls.certresolver=letsencryptresolver"
+      - "traefik.http.routers.todos.middlewares=https-redirect"
     depends_on:
       - redis
     networks:
@@ -99,22 +92,12 @@ services:
       context: ./users-api
       dockerfile: Dockerfile
     labels:
-      - traefik.enable=true
-      # HTTP Service
-      - traefik.http.services.users.loadbalancer.server.port=8083
-      # HTTP Router 
-      - traefik.http.routers.users-http.rule=(Host(`demo-domain.online`) && PathPrefix(`/api/users`))
-      - traefik.http.routers.users-http.entrypoints=web
-      - traefik.http.routers.users-http.service=users-api
-      # HTTP to HTTPS redirect
-      - traefik.http.routers.users-http.middlewares=https-redirect
-      - traefik.http.middlewares.https-redirect.redirectScheme.scheme=https
-      - traefik.http.middlewares.https-redirect.redirectScheme.permanent=true
-      # HTTPS Router
-      - traefik.http.routers.users-https.rule=(Host(`demo-domain.online`) && PathPrefix(`/api/users`))
-      - traefik.http.routers.users-https.entrypoints=websecure
-      - traefik.http.routers.users-https.tls.certresolver=letsencryptresolver
-      - traefik.http.routers.users-https.service=users
+      - "traefik.enable=true"
+      - "traefik.http.services.users.loadbalancer.server.port=8083"
+      - "traefik.http.routers.users.rule=Host(`demo-domain.online`) && PathPrefix(`/api/users`)"
+      - "traefik.http.routers.users.entrypoints=websecure"
+      - "traefik.http.routers.users.tls.certresolver=letsencryptresolver"
+      - "traefik.http.routers.users.middlewares=https-redirect"
     networks:
       - web
 
