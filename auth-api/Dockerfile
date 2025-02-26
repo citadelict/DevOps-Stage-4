@@ -25,7 +25,7 @@ WORKDIR /root/
 COPY --from=build /app/auth-api .
 
 # Expose port
-EXPOSE 8080
+EXPOSE 8081
 
 # Command to run
 CMD ["./auth-api"]
