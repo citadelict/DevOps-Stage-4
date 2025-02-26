@@ -45,8 +45,8 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - VITE_AUTH_API_ADDRESS=https://auth-api:8081
-      - VITE_TODOS_API_ADDRESS=https://todos-api:8082
+      - VITE_AUTH_API_ADDRESS=https://demo-domain.online/api/auth
+      - VITE_TODOS_API_ADDRESS=https://demo-domain.online/api/todos
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -71,7 +71,7 @@ services:
       - "8081:8081"
     environment:
       - JWT_SECRET=myfancysecret
-      - USERS_API_ADDRESS=https://users-api:8083
+      - USERS_API_ADDRESS=https://demo-domain.online/api/users
       - AUTH_API_PORT=8081
       - users-api
     networks:
@@ -82,6 +82,8 @@ services:
       - "traefik.http.services.auth.loadbalancer.server.port=8081"
       - "traefik.http.routers.auth.entrypoints=websecure"
       - "traefik.http.routers.auth.tls.certresolver=letsencryptresolver"
+      - "traefik.http.middlewares.auth-stripprefix.stripprefix.prefixes=/api/auth"
+      - "traefik.http.routers.auth.middlewares=auth-stripprefix"
 
   todos-api:
     build:
