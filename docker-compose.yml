@@ -72,7 +72,7 @@ services:
     environment:
       - JWT_SECRET=myfancysecret
       - USERS_API_ADDRESS=http://users-api:8083
-    depends_on:
+      - AUTH_API_PORT=8081
       - users-api
     networks:
       - web
