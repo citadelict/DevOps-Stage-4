@@ -1,0 +1,8 @@
+/home/citatech/DevOps-Stage-4/users-api/src/main/java/com/elgris/usersapi/security/AccessUserFilter.java
+/home/citatech/DevOps-Stage-4/users-api/src/main/java/com/elgris/usersapi/UsersApiApplication.java
+/home/citatech/DevOps-Stage-4/users-api/src/main/java/com/elgris/usersapi/repository/UserRepository.java
+/home/citatech/DevOps-Stage-4/users-api/src/main/java/com/elgris/usersapi/api/UsersController.java
+/home/citatech/DevOps-Stage-4/users-api/src/main/java/com/elgris/usersapi/security/JwtAuthenticationFilter.java
+/home/citatech/DevOps-Stage-4/users-api/src/main/java/com/elgris/usersapi/models/UserRole.java
+/home/citatech/DevOps-Stage-4/users-api/src/main/java/com/elgris/usersapi/models/User.java
+/home/citatech/DevOps-Stage-4/users-api/src/main/java/com/elgris/usersapi/configuration/SecurityConfiguration.java
