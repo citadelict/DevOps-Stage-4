@@ -43,10 +43,10 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "${PORT}:${PORT}"
+      - "8080:8080"
     environment:
-      - VITE_AUTH_API_ADDRESS=${AUTH_API_ADDRESS}
-      - VITE_TODOS_API_ADDRESS=${TODOS_API_ADDRESS}
+      - VITE_AUTH_API_ADDRESS=http://auth-api:8081
+      - VITE_TODOS_API_ADDRESS=http://todos-api:8082
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -59,7 +59,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.frontend.rule=Host(`demo-domain.online`)"
-      - "traefik.http.services.frontend.loadbalancer.server.port=${PORT}"
+      - "traefik.http.services.frontend.loadbalancer.server.port=8080"
       - "traefik.http.routers.frontend.entrypoints=websecure"
       - "traefik.http.routers.frontend.tls.certresolver=letsencryptresolver"
 
@@ -68,10 +68,10 @@ services:
       context: ./auth-api
       dockerfile: Dockerfile
     ports:
-      - "${AUTH_API_PORT}:${AUTH_API_PORT}"
+      - "8081:8081"
     environment:
-      - JWT_SECRET=${JWT_SECRET}
-      - USERS_API_ADDRESS=${USERS_API_ADDRESS}
+      - JWT_SECRET=myfancysecret
+      - USERS_API_ADDRESS=http://users-api:8083
     depends_on:
       - users-api
     networks:
@@ -79,7 +79,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.auth.rule=Host(`demo-domain.online`) && PathPrefix(`/api/auth`)"
-      - "traefik.http.services.auth.loadbalancer.server.port=${AUTH_API_PORT}"
+      - "traefik.http.services.auth.loadbalancer.server.port=8081"
       - "traefik.http.routers.auth.entrypoints=websecure"
       - "traefik.http.routers.auth.tls.certresolver=letsencryptresolver"
 
@@ -88,12 +88,12 @@ services:
       context: ./todos-api
       dockerfile: Dockerfile
     ports:
-      - "${TODOS_API_PORT}:${TODOS_API_PORT}"
+      - "8082:8082"
     environment:
-      - JWT_SECRET=${JWT_SECRET}
-      - REDIS_HOST=${REDIS_HOST}
-      - REDIS_PORT=${REDIS_PORT}
-      - REDIS_CHANNEL=${REDIS_CHANNEL}
+      - JWT_SECRET=myfancysecret
+      - REDIS_HOST=redis-queue
+      - REDIS_PORT=6379
+      - REDIS_CHANNEL=log_channel
     depends_on:
       - redis-queue
     networks:
@@ -101,7 +101,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.todos.rule=Host(`demo-domain.online`) && PathPrefix(`/api/todos`)"
-      - "traefik.http.services.todos.loadbalancer.server.port=${TODOS_API_PORT}"
+      - "traefik.http.services.todos.loadbalancer.server.port=8082"
       - "traefik.http.routers.todos.entrypoints=websecure"
       - "traefik.http.routers.todos.tls.certresolver=letsencryptresolver"
 
@@ -110,21 +110,21 @@ services:
       context: ./users-api
       dockerfile: Dockerfile
     ports:
-      - "${SERVER_PORT}:${SERVER_PORT}"
+      - "8083:8083"
     environment:
-      - JWT_SECRET=${JWT_SECRET}
-      - DEFAULT_ADMIN_USERNAME=${DEFAULT_ADMIN_USERNAME}
-      - DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD}
-      - DEFAULT_HNG_USERNAME=${DEFAULT_HNG_USERNAME}
-      - DEFAULT_HNG_PASSWORD=${DEFAULT_HNG_PASSWORD}
-      - DEFAULT_USER_USERNAME=${DEFAULT_USER_USERNAME}
-      - DEFAULT_USER_PASSWORD=${DEFAULT_USER_PASSWORD}
+      - JWT_SECRET=myfancysecret
+      - DEFAULT_ADMIN_USERNAME=admin
+      - DEFAULT_ADMIN_PASSWORD=Admin123
+      - DEFAULT_HNG_USERNAME=hng
+      - DEFAULT_HNG_PASSWORD=HngTech
+      - DEFAULT_USER_USERNAME=user
+      - DEFAULT_USER_PASSWORD=Password
     networks:
       - web
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.users.rule=Host(`demo-domain.online`) && PathPrefix(`/api/users`)"
-      - "traefik.http.services.users.loadbalancer.server.port=${SERVER_PORT}"
+      - "traefik.http.services.users.loadbalancer.server.port=8083"
       - "traefik.http.routers.users.entrypoints=websecure"
       - "traefik.http.routers.users.tls.certresolver=letsencryptresolver"
 
@@ -133,9 +133,9 @@ services:
       context: ./log-message-processor
       dockerfile: Dockerfile
     environment:
-      - REDIS_HOST=${REDIS_HOST}
-      - REDIS_PORT=${REDIS_PORT}
-      - REDIS_CHANNEL=${REDIS_CHANNEL}
+      - REDIS_HOST=redis-queue
+      - REDIS_PORT=6379
+      - REDIS_CHANNEL=log_channel
     depends_on:
       - redis-queue
     networks:
