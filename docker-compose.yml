@@ -45,8 +45,8 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - VITE_AUTH_API_ADDRESS=http://auth-api:8081
-      - VITE_TODOS_API_ADDRESS=http://todos-api:8082
+      - VITE_AUTH_API_ADDRESS=https://auth-api:8081
+      - VITE_TODOS_API_ADDRESS=https://todos-api:8082
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -71,7 +71,7 @@ services:
       - "8081:8081"
     environment:
       - JWT_SECRET=myfancysecret
-      - USERS_API_ADDRESS=http://users-api:8083
+      - USERS_API_ADDRESS=https://users-api:8083
       - AUTH_API_PORT=8081
       - users-api
     networks:
