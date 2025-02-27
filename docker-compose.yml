@@ -5,15 +5,17 @@ services:
     image: "traefik:v2.10"
     container_name: "traefik"
     command:
-      - "--log.level=DEBUG"
+      - "--log.level=INFO"
       - "--api.insecure=false"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
       - "--certificatesresolvers.letsencryptresolver.acme.httpchallenge=true"
       - "--certificatesresolvers.letsencryptresolver.acme.httpchallenge.entrypoint=web"
-      - "--certificatesresolvers.letsencryptresolver.acme.email=citatech@proton.me"
+      - "--certificatesresolvers.letsencryptresolver.acme.email=admin@demo-domain.online"
       - "--certificatesresolvers.letsencryptresolver.acme.storage=/etc/traefik/acme.json"
     ports:
       - "80:80"
@@ -21,22 +23,10 @@ services:
     networks:
       - web
     volumes:
-      - ./traefik/acme.json:/etc/traefik/acme.json
       - /var/run/docker.sock:/var/run/docker.sock
+      - traefik-certificates:/etc/traefik
     labels:
       - "traefik.enable=true"
-      # Dashboard
-      - "traefik.http.routers.dashboard.rule=Host(`traefik.demo-domain.online`)"
-      - "traefik.http.routers.dashboard.service=api@internal"
-      - "traefik.http.routers.dashboard.entrypoints=websecure"
-      - "traefik.http.routers.dashboard.tls.certresolver=letsencryptresolver"
-      - "traefik.http.routers.dashboard.middlewares=auth"
-      - "traefik.http.middlewares.auth.basicauth.users=admin:$$apr1$$0s0j0dWJ$$Q1Z9Ul9tqExfjFSf5RgMR0"
-      # ACME challenge
-      - "traefik.http.routers.acme.rule=PathPrefix(`/.well-known/acme-challenge/`)"
-      - "traefik.http.routers.acme.entrypoints=web"
-      - "traefik.http.routers.acme.service=api@internal"
-      - "traefik.http.routers.acme.tls=false"
 
   frontend:
     build:
@@ -45,14 +35,16 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - VITE_AUTH_API_ADDRESS=https://demo-domain.online/api/auth
       - VITE_TODOS_API_ADDRESS=https://demo-domain.online/api/todos
+      - VITE_USERS_API_ADDRESS=https://demo-domain.online/api/users
+      - VITE_AUTH_API_ADDRESS=https://demo-domain.online/api/auth
     volumes:
       - ./frontend:/app
       - /app/node_modules
     depends_on:
-      - auth-api
       - todos-api
+      - users-api
+      - auth-api
     command: sh -c "npm run dev -- --host 0.0.0.0"
     networks:
       - web
@@ -70,9 +62,10 @@ services:
     ports:
       - "8081:8081"
     environment:
-      - JWT_SECRET=myfancysecret
-      - USERS_API_ADDRESS=https://demo-domain.online/api/users
       - AUTH_API_PORT=8081
+      - JWT_SECRET=myfancysecret
+      - USERS_API_ADDRESS=http://users-api:8083
+    depends_on:
       - users-api
     networks:
       - web
@@ -80,10 +73,10 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.auth.rule=Host(`demo-domain.online`) && PathPrefix(`/api/auth`)"
       - "traefik.http.services.auth.loadbalancer.server.port=8081"
-      - "traefik.http.routers.auth.entrypoints=websecure"
-      - "traefik.http.routers.auth.tls.certresolver=letsencryptresolver"
       - "traefik.http.middlewares.auth-stripprefix.stripprefix.prefixes=/api/auth"
       - "traefik.http.routers.auth.middlewares=auth-stripprefix"
+      - "traefik.http.routers.auth.entrypoints=websecure"
+      - "traefik.http.routers.auth.tls.certresolver=letsencryptresolver"
 
   todos-api:
     build:
@@ -104,6 +97,8 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.todos.rule=Host(`demo-domain.online`) && PathPrefix(`/api/todos`)"
       - "traefik.http.services.todos.loadbalancer.server.port=8082"
+      - "traefik.http.middlewares.todos-stripprefix.stripprefix.prefixes=/api/todos"
+      - "traefik.http.routers.todos.middlewares=todos-stripprefix"
       - "traefik.http.routers.todos.entrypoints=websecure"
       - "traefik.http.routers.todos.tls.certresolver=letsencryptresolver"
 
@@ -114,20 +109,16 @@ services:
     ports:
       - "8083:8083"
     environment:
+      - SERVER_PORT=8083
       - JWT_SECRET=myfancysecret
-      - DEFAULT_ADMIN_USERNAME=admin
-      - DEFAULT_ADMIN_PASSWORD=Admin123
-      - DEFAULT_HNG_USERNAME=hng
-      - DEFAULT_HNG_PASSWORD=HngTech
-      - DEFAULT_USER_USERNAME=user
-      - DEFAULT_USER_PASSWORD=Password
-      - SERVER_PORT=8083  # Add this
     networks:
       - web
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.users.rule=Host(`demo-domain.online`) && PathPrefix(`/api/users`)"
       - "traefik.http.services.users.loadbalancer.server.port=8083"
+      - "traefik.http.middlewares.users-stripprefix.stripprefix.prefixes=/api/users"
+      - "traefik.http.routers.users.middlewares=users-stripprefix"
       - "traefik.http.routers.users.entrypoints=websecure"
       - "traefik.http.routers.users.tls.certresolver=letsencryptresolver"
 
@@ -145,10 +136,18 @@ services:
       - web
 
   redis-queue:
-    image: redis:alpine
+    image: "redis:alpine"
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
     networks:
       - web
 
 networks:
   web:
-    external: true
+    driver: bridge
+
+volumes:
+  traefik-certificates:
+  redis-data:
